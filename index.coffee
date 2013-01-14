@@ -7,8 +7,13 @@ url = require("url")
 request = require("request")
 path = require("path")
 
-module.exports = app = express.createServer()
 
+
+# Set defaults in nconf
+require "./configure"
+
+
+app = module.exports = express()
 runUrl = nconf.get("url:run")
 
 genid = (len = 16, prefix = "", keyspace = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789") ->
@@ -16,16 +21,14 @@ genid = (len = 16, prefix = "", keyspace = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghij
   prefix
 
 
-app.configure ->
-  app.use require("./middleware/cors").middleware()
-  app.use require("./middleware/json").middleware()
-  
-  app.set "views", "#{__dirname}/views"
-  app.set "view engine", "jade"
-  app.set "view options", layout: false
+app.use require("./middleware/cors").middleware()
+app.use express.bodyParser()
+
 
 LRU = require("lru-cache")
 previews = LRU(512)
+sourcemaps = LRU(512)
+
 apiUrl = nconf.get("url:api")
 
 coffee = require("coffee-script")
@@ -42,7 +45,7 @@ compilers =
   sass:
     match: /\.css$/
     ext: ['sass']
-    compile: (str, fn) ->
+    compile: (filename, source, str, fn) ->
       try
         fn(null, sass.render(str))
       catch err
@@ -51,7 +54,7 @@ compilers =
   less: 
     match: /\.css$/
     ext: ['less']
-    compile: (str, fn) ->
+    compile: (filename, source, str, fn) ->
       try
         less.render(str, fn)
       catch err
@@ -60,7 +63,7 @@ compilers =
   stylus: 
     match: /\.css/
     ext: ['styl']
-    compile: (str, fn) ->
+    compile: (filename, source, str, fn) ->
       try
         stylus(str)
           .use(nib())
@@ -71,7 +74,7 @@ compilers =
   coffeescript: 
     match: /\.js$/
     ext: ['coffee']
-    compile: (str, fn) ->
+    compile: (filename, source, str, fn) ->
       try
         fn(null, coffee.compile(str, bare: true))
       catch err
@@ -80,7 +83,7 @@ compilers =
   livescript: 
     match: /\.js$/
     ext: ['ls']
-    compile: (str, fn) ->
+    compile: (filename, source, str, fn) ->
       try
         fn(null, livescript.compile(str))
       catch err
@@ -89,7 +92,7 @@ compilers =
   icedcoffee: 
     match: /\.js$/
     ext: ['iced']
-    compile: (str, fn) ->
+    compile: (filename, source, str, fn) ->
       try
         fn(null, iced.compile(str, runtime: "inline"))
       catch err
@@ -98,7 +101,7 @@ compilers =
   jade: 
     match: /\.html$/
     ext: ['jade']
-    compile: (str, fn) ->
+    compile: (filename, source, str, fn) ->
       render = jade.compile(str, pretty: true)
       try
         fn(null, render({}))
@@ -108,11 +111,13 @@ compilers =
   markdown: 
     match: /\.html$/
     ext: ['md',"markdown"]
-    compile: (str, fn) ->
+    compile: (filename, source, str, fn) ->
       try
         fn(null, markdown(str))
       catch err
         fn(err)
+  
+  typescript: require("./compilers/typescript")
 
 renderPlunkFile = (req, res, next) ->
   # TODO: Determine if a special plunk 'landing' page should be served and serve it
@@ -120,34 +125,45 @@ renderPlunkFile = (req, res, next) ->
   filename = req.params[0] or "index.html"
   file = plunk.files[filename]
   
-  res.header "Cache-Control", "no-cache"
-  res.header "Expires", 0
+  res.set "Cache-Control", "no-cache"
+  res.set "Expires", 0
   
-  if file then res.send(file.content, {"Content-Type": if req.accepts(file.mime) then file.mime else "text/plain"})
-  else if filename
+  if file
+    res.set("Content-Type": if req.accepts(file.mime) then file.mime else "text/plain")
+    res.send(200, file.content)
+  else
     base = path.basename(filename, path.extname(filename))
     type = mime.lookup(filename) or "text/plain"
     
     for name, compiler of compilers when filename.match(compiler.match)
       for ext in compiler.ext
         if found = plunk.files["#{base}.#{ext}"]
-          compiler.compile found.content, (err, compiled) ->
+          compiler.compile filename, "#{base}.#{ext}", found.content, (err, compiled, sourcemap) ->
             if err then next(err)
-            else res.send(compiled, {"Content-Type": if req.accepts(type) then type else "text/plain"})
+            else
+              if sourcemap
+                sourcemap_id = "#{genid(16)}/#{filename}"
+                sourcemaps.set sourcemap_id, sourcemap
+                res.header "X-SourceMap", "/sourcemaps/#{sourcemap_id}/#{filename}.map"
+              res.set "Content-Type", if req.accepts(type) then type else "text/plain"
+              res.send 200, compiled
           break
     
     res.send(404) unless found
-    
-  else
-    res.local "plunk", plunk
-    res.render "directory"
-    
+
+
+
+app.get "/sourcemaps/:id/:filename", (req, res, next) ->
+  if sourcemap = sourcemaps.get("#{req.params.id}/#{req.params.filename}")
+    res.set "Content-Type", "application/json"
+    res.send 200, sourcemap
+  else res.send(404)
 
 app.get "/plunks/:id/*", (req, res, next) ->
   req_url = url.parse(req.url)
   unless req.params[0] or /\/$/.test(req_url.pathname)
     req_url.pathname += "/"
-    return res.redirect(url.format(req_url), 301)
+    return res.redirect(301, url.format(req_url))
   
   request.get "#{apiUrl}/plunks/#{req.params.id}", (err, response, body) ->
     return res.send(500) if err
@@ -161,7 +177,7 @@ app.get "/plunks/:id/*", (req, res, next) ->
     unless req.plunk then res.send(404) # TODO: Better error page
     else renderPlunkFile(req, res, next)
 
-app.get "/plunks/:id", (req, res) -> res.redirect("/#{req.params.id}/", 301)
+app.get "/plunks/:id", (req, res) -> res.redirect(301, "/#{req.params.id}/")
 
 app.post "/:id?", (req, res, next) ->
   json = req.body
@@ -194,7 +210,7 @@ app.post "/:id?", (req, res, next) ->
     
     status = if req.params.id then 200 else 201
     
-    res.json(json, status)
+    res.json(status, json)
 
 
 
@@ -205,9 +221,9 @@ app.get "/:id/*", (req, res, next) ->
     
     unless req.params[0] or /\/$/.test(req_url.pathname)
       req_url.pathname += "/"
-      return res.redirect(url.format(req_url), 301)
+      return res.redirect(301, url.format(req_url))
     
     renderPlunkFile(req, res, next)
 
 app.get "*", (req, res) ->
-  res.send("Preview does not exist or has expired.", 404)
+  res.send(404, "Preview does not exist or has expired.")
