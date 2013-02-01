@@ -42,7 +42,10 @@ module.exports =
     compiler.typeCheck()
     
     compiler.emit (filename) ->
+      console.log "Compiling", filename
       if filename.match(/\.map$/) then mapOutput
       else jsOutput
+    
+    console.log "Sourcemap", mapOutput.source
     
     fn null, jsOutput.source, mapOutput.source

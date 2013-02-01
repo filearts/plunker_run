@@ -6,7 +6,7 @@ module.exports.middleware = (config = {}) ->
 
     res.set("Access-Control-Allow-Origin", req.headers.origin or "*")
     res.set("Access-Control-Allow-Methods", "OPTIONS,GET,PUT,POST,DELETE")
-    res.set("Access-Control-Allow-Headers", "Authorization, User-Agent, Referer, X-Requested-With, Proxy-Authorization, Proxy-Connection, Accept-Language, Accept-Encoding, Accept-Charset, Connection, Content-Length, Host, Origin, Pragma, Accept-Charset, Cache-Control, Accept, Content-Type")
+    res.set("Access-Control-Allow-Headers", "Authorization, User-Agent, Referer, SourceMap, X-Requested-With, Proxy-Authorization, Proxy-Connection, Accept-Language, Accept-Encoding, Accept-Charset, Connection, Content-Length, Host, Origin, Pragma, Accept-Charset, Cache-Control, Accept, Content-Type")
     res.set("Access-Control-Expose-Headers", "Link")
     res.set("Access-Control-Max-Age", "60")
 

@@ -10,7 +10,7 @@
   "engines": {
     "node": "0.8.x"
   },
-  "version": "0.3.14-21",
+  "version": "0.3.14-53",
   "private": true,
   "dependencies": {
     "coffee-script": "1.x",
@@ -22,12 +22,14 @@
     "json-schema": "https://github.com/kriszyp/json-schema/tarball/master",
     "lru-cache": "1.1.x",
     "request": "2.x",
+    "node-sass": "https://github.com/filearts/node-sass/tarball/master",
     "sass": "*",
     "less": "*",
     "jade": "*",
     "marked": "*",
     "LiveScript": "*",
     "iced-coffee-script": "*",
+    "coffee-script-redux": "https://github.com/michaelficarra/CoffeeScriptRedux/tarball/master",
     "stylus": "*",
     "nib": "*",
     "typescript-wrapper": "*"

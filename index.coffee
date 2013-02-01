@@ -31,21 +31,31 @@ sourcemaps = LRU(512)
 
 apiUrl = nconf.get("url:api")
 
-coffee = require("coffee-script")
+coffee = require("coffee-script-redux")
 livescript = require("LiveScript")
 iced = require("iced-coffee-script")
 less = require("less")
 sass = require("sass")
+scss = require("node-sass")
 jade = require("jade")
 markdown = require("marked")
 stylus = require("stylus")
 nib = require("nib")
 
 compilers = 
+  scss:
+    match: /\.css$/
+    ext: ['scss']
+    compile: (path, filename, source, str, fn) ->
+      try
+        scss.render(str, fn)
+      catch err
+        fn(err)
+
   sass:
     match: /\.css$/
     ext: ['sass']
-    compile: (filename, source, str, fn) ->
+    compile: (path, filename, source, str, fn) ->
       try
         fn(null, sass.render(str))
       catch err
@@ -54,7 +64,7 @@ compilers =
   less: 
     match: /\.css$/
     ext: ['less']
-    compile: (filename, source, str, fn) ->
+    compile: (path, filename, source, str, fn) ->
       try
         less.render(str, fn)
       catch err
@@ -63,7 +73,7 @@ compilers =
   stylus: 
     match: /\.css/
     ext: ['styl']
-    compile: (filename, source, str, fn) ->
+    compile: (path, filename, source, str, fn) ->
       try
         stylus(str)
           .use(nib())
@@ -74,16 +84,23 @@ compilers =
   coffeescript: 
     match: /\.js$/
     ext: ['coffee']
-    compile: (filename, source, str, fn) ->
+    compile: (path, filename, source, str, fn) ->
       try
-        fn(null, coffee.compile(str, bare: true))
+        csAst = coffee.parse str, optimise: false, raw: true, inputSource: "#{path}#{source}"
+        jsAst = coffee.compile csAst, bare: true
+        
+        smap = coffee.sourceMap(jsAst, "#{path}#{source}")
+        js = coffee.js(jsAst) + "\n//@ sourceMappingURL=#{path}#{filename}.map"
+
+
+        fn(null, js, smap)
       catch err
         fn(err)
       
   livescript: 
     match: /\.js$/
     ext: ['ls']
-    compile: (filename, source, str, fn) ->
+    compile: (path, filename, source, str, fn) ->
       try
         fn(null, livescript.compile(str))
       catch err
@@ -92,7 +109,7 @@ compilers =
   icedcoffee: 
     match: /\.js$/
     ext: ['iced']
-    compile: (filename, source, str, fn) ->
+    compile: (path, filename, source, str, fn) ->
       try
         fn(null, iced.compile(str, runtime: "inline"))
       catch err
@@ -101,7 +118,7 @@ compilers =
   jade: 
     match: /\.html$/
     ext: ['jade']
-    compile: (filename, source, str, fn) ->
+    compile: (path, filename, source, str, fn) ->
       render = jade.compile(str, pretty: true)
       try
         fn(null, render({}))
@@ -111,7 +128,7 @@ compilers =
   markdown: 
     match: /\.html$/
     ext: ['md',"markdown"]
-    compile: (filename, source, str, fn) ->
+    compile: (path, filename, source, str, fn) ->
       try
         fn(null, markdown(str))
       catch err
@@ -120,7 +137,6 @@ compilers =
   typescript: require("./compilers/typescript")
 
 renderPlunkFile = (req, res, next) ->
-  # TODO: Determine if a special plunk 'landing' page should be served and serve it
   plunk = req.plunk
   filename = req.params[0] or "index.html"
   file = plunk.files[filename]
@@ -130,7 +146,14 @@ renderPlunkFile = (req, res, next) ->
   
   if file
     res.set("Content-Type": if req.accepts(file.mime) then file.mime else "text/plain")
-    res.send(200, file.content)
+    return res.send(200, file.content)
+    
+  else if sourcemap = sourcemaps.get("#{req.dir}#{filename}")
+    res.set "Content-Type", "application/json"
+    res.send 200, sourcemap
+    
+    console.log "[**] Served sourcemap", "#{req.dir}#{filename}"
+    
   else
     base = path.basename(filename, path.extname(filename))
     type = mime.lookup(filename) or "text/plain"
@@ -138,32 +161,31 @@ renderPlunkFile = (req, res, next) ->
     for name, compiler of compilers when filename.match(compiler.match)
       for ext in compiler.ext
         if found = plunk.files["#{base}.#{ext}"]
-          compiler.compile filename, "#{base}.#{ext}", found.content, (err, compiled, sourcemap) ->
-            if err then next(err)
+          return compiler.compile req.dir, filename, found.filename, found.content, (err, compiled, sourcemap) ->
+            if err
+              console.log "[ERR] Compilation error:", err.message
+              return res.send 500, err.message or "Compilation error"
             else
               if sourcemap
-                sourcemap_id = "#{genid(16)}/#{filename}"
+                sourcemap_id = "#{req.dir}#{filename}.map"
                 sourcemaps.set sourcemap_id, sourcemap
-                res.header "X-SourceMap", "/sourcemaps/#{sourcemap_id}/#{filename}.map"
+                
+                res.set "SourceMap", sourcemap_id
+                
               res.set "Content-Type", if req.accepts(type) then type else "text/plain"
               res.send 200, compiled
-          break
     
-    res.send(404) unless found
-
-
-
-app.get "/sourcemaps/:id/:filename", (req, res, next) ->
-  if sourcemap = sourcemaps.get("#{req.params.id}/#{req.params.filename}")
-    res.set "Content-Type", "application/json"
-    res.send 200, sourcemap
-  else res.send(404)
+    # Control will reach here if no file was found
+    console.log "[ERR] No suitable source file for: ", filename
+    res.send(404)
 
 app.get "/plunks/:id/*", (req, res, next) ->
   req_url = url.parse(req.url)
   unless req.params[0] or /\/$/.test(req_url.pathname)
     req_url.pathname += "/"
     return res.redirect(301, url.format(req_url))
+  
+  req.dir = "/plunks/#{req.params.id}/"
   
   request.get "#{apiUrl}/plunks/#{req.params.id}", (err, response, body) ->
     return res.send(500) if err
@@ -192,7 +214,7 @@ app.post "/:id?", (req, res, next) ->
       property: "files"
       message: "A minimum of one file is required"
   
-  unless valid then next(new Error("Invalid json: #{errors}"))
+  unless valid then return next(new Error("Invalid json: #{errors}"))
   else
     id = req.params.id or genid() # Don't care about id clashes. They are disposable anyway
     json.id = id
@@ -223,6 +245,8 @@ app.get "/:id/*", (req, res, next) ->
       req_url.pathname += "/"
       return res.redirect(301, url.format(req_url))
     
+    req.dir = "/#{req.params.id}/"
+  
     renderPlunkFile(req, res, next)
 
 app.get "*", (req, res) ->
