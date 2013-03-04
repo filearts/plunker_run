@@ -10,10 +10,10 @@
   "engines": {
     "node": "0.8.x"
   },
-  "version": "0.3.14-53",
+  "version": "0.3.14-56",
   "private": true,
   "dependencies": {
-    "coffee-script": "1.x",
+    "coffee-script": "1.6.x",
     "express": "3.x",
     "gzippo": "0.1.x",
     "mime": "*",
@@ -29,7 +29,6 @@
     "marked": "*",
     "LiveScript": "*",
     "iced-coffee-script": "*",
-    "coffee-script-redux": "https://github.com/michaelficarra/CoffeeScriptRedux/tarball/master",
     "stylus": "*",
     "nib": "*",
     "typescript-wrapper": "*"

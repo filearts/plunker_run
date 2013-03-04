@@ -31,7 +31,7 @@ sourcemaps = LRU(512)
 
 apiUrl = nconf.get("url:api")
 
-coffee = require("coffee-script-redux")
+coffee = require("coffee-script")
 livescript = require("LiveScript")
 iced = require("iced-coffee-script")
 less = require("less")
@@ -86,14 +86,16 @@ compilers =
     ext: ['coffee']
     compile: (path, filename, source, str, fn) ->
       try
-        csAst = coffee.parse str, optimise: false, raw: true, inputSource: "#{path}#{source}"
-        jsAst = coffee.compile csAst, bare: true
+        answer = coffee.compile str,
+          bare: true
+          returnObject: true
+          sourceMap: true
+          filename: "#{path}#{source}"
+          
+        js = answer.js + "\n//@ sourceMappingURL=#{path}#{filename}.map"
+        smap = answer.v3SourceMap
         
-        smap = coffee.sourceMap(jsAst, "#{path}#{source}")
-        js = coffee.js(jsAst) + "\n//@ sourceMappingURL=#{path}#{filename}.map"
-
-
-        fn(null, js, smap)
+        fn null, js, smap
       catch err
         fn(err)
       
