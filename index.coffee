@@ -157,25 +157,30 @@ renderPlunkFile = (req, res, next) ->
     console.log "[**] Served sourcemap", "#{req.dir}#{filename}"
     
   else
-    base = path.basename(filename, path.extname(filename))
-    type = mime.lookup(filename) or "text/plain"
-    
-    for name, compiler of compilers when filename.match(compiler.match)
-      for ext in compiler.ext
-        if found = plunk.files["#{base}.#{ext}"]
-          return compiler.compile req.dir, filename, found.filename, found.content, (err, compiled, sourcemap) ->
-            if err
-              console.log "[ERR] Compilation error:", err.message
-              return res.send 500, err.message or "Compilation error"
-            else
-              if sourcemap
-                sourcemap_id = "#{req.dir}#{filename}.map"
-                sourcemaps.set sourcemap_id, sourcemap
-                
-                res.set "SourceMap", sourcemap_id
-                
-              res.set "Content-Type", if req.accepts(type) then type else "text/plain"
-              res.send 200, compiled
+    render = (filename) ->
+      base = path.basename(filename, path.extname(filename))
+      type = mime.lookup(filename) or "text/plain"
+      
+      for name, compiler of compilers when filename.match(compiler.match)
+        for ext in compiler.ext
+          if found = plunk.files["#{base}.#{ext}"]
+            compiler.compile req.dir, filename, found.filename, found.content, (err, compiled, sourcemap) ->
+              if err
+                console.log "[ERR] Compilation error:", err.message
+                return res.send 500, err.message or "Compilation error"
+              else
+                if sourcemap
+                  sourcemap_id = "#{req.dir}#{filename}.map"
+                  sourcemaps.set sourcemap_id, sourcemap
+                  
+                  res.set "SourceMap", sourcemap_id
+                  
+                res.set "Content-Type", if req.accepts(type) then type else "text/plain"
+                res.send 200, compiled
+            return true
+      
+    for filename in ["index.html", "example.html", "demo.html", "readme.html"]
+      return if render(filename)
     
     # Control will reach here if no file was found
     console.log "[ERR] No suitable source file for: ", filename
@@ -189,7 +194,7 @@ app.get "/plunks/:id/*", (req, res, next) ->
   
   req.dir = "/plunks/#{req.params.id}/"
   
-  request.get "#{apiUrl}/plunks/#{req.params.id}", (err, response, body) ->
+  request.get "#{apiUrl}/plunks/#{req.params.id}?nv=1", (err, response, body) ->
     return res.send(500) if err
     return res.send(response.statusCode) if response.statusCode >= 400
     
