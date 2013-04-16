@@ -178,8 +178,11 @@ renderPlunkFile = (req, res, next) ->
                 res.set "Content-Type", if req.accepts(type) then type else "text/plain"
                 res.send 200, compiled
             return true
+            
+    test = [filename]
+    test.push(file) for file in ["index.html", "example.html", "demo.html", "readme.html"] when 0 > test.indexOf(file)
       
-    for filename in ["index.html", "example.html", "demo.html", "readme.html"]
+    for filename in test
       return if render(filename)
     
     # Control will reach here if no file was found
