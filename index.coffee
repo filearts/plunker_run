@@ -41,12 +41,13 @@ jade = require("jade")
 markdown = require("marked")
 stylus = require("stylus")
 nib = require("nib")
+traceur = require("traceur")
 
 compilers = 
   scss:
     match: /\.css$/
     ext: ['scss']
-    compile: (path, filename, source, str, fn) ->
+    compile: (path, filename, source, str, plunk, fn) ->
       try
         scss.render(str, fn)
       catch err
@@ -55,7 +56,7 @@ compilers =
   sass:
     match: /\.css$/
     ext: ['sass']
-    compile: (path, filename, source, str, fn) ->
+    compile: (path, filename, source, str, plunk, fn) ->
       try
         fn(null, sass.render(str))
       catch err
@@ -64,7 +65,7 @@ compilers =
   less: 
     match: /\.css$/
     ext: ['less']
-    compile: (path, filename, source, str, fn) ->
+    compile: (path, filename, source, str, plunk, fn) ->
       try
         less.render(str, fn)
       catch err
@@ -73,7 +74,7 @@ compilers =
   stylus: 
     match: /\.css/
     ext: ['styl']
-    compile: (path, filename, source, str, fn) ->
+    compile: (path, filename, source, str, plunk, fn) ->
       try
         stylus(str)
           .use(nib())
@@ -84,7 +85,7 @@ compilers =
   coffeescript: 
     match: /\.js$/
     ext: ['coffee']
-    compile: (path, filename, source, str, fn) ->
+    compile: (path, filename, source, str, plunk, fn) ->
       try
         answer = coffee.compile str,
           bare: true
@@ -102,7 +103,7 @@ compilers =
   livescript: 
     match: /\.js$/
     ext: ['ls']
-    compile: (path, filename, source, str, fn) ->
+    compile: (path, filename, source, str, plunk, fn) ->
       try
         fn(null, livescript.compile(str))
       catch err
@@ -111,7 +112,7 @@ compilers =
   icedcoffee: 
     match: /\.js$/
     ext: ['iced']
-    compile: (path, filename, source, str, fn) ->
+    compile: (path, filename, source, str, plunk, fn) ->
       try
         fn(null, iced.compile(str, runtime: "inline"))
       catch err
@@ -120,7 +121,7 @@ compilers =
   jade: 
     match: /\.html$/
     ext: ['jade']
-    compile: (path, filename, source, str, fn) ->
+    compile: (path, filename, source, str, plunk, fn) ->
       render = jade.compile(str, pretty: true)
       try
         fn(null, render({}))
@@ -130,13 +131,15 @@ compilers =
   markdown: 
     match: /\.html$/
     ext: ['md',"markdown"]
-    compile: (path, filename, source, str, fn) ->
+    compile: (path, filename, source, str, plunk, fn) ->
       try
         fn(null, markdown(str))
       catch err
         fn(err)
   
   typescript: require("./compilers/typescript")
+  
+  traceur: require("./compilers/traceur")
 
 renderPlunkFile = (req, res, next) ->
   plunk = req.plunk
@@ -158,13 +161,14 @@ renderPlunkFile = (req, res, next) ->
     
   else
     render = (filename) ->
-      base = path.basename(filename, path.extname(filename))
+      extension = "." + path.basename(filename).split(".").slice(1).join(".")
+      base = path.basename(filename, extension)
       type = mime.lookup(filename) or "text/plain"
       
       for name, compiler of compilers when filename.match(compiler.match)
         for ext in compiler.ext
           if found = plunk.files["#{base}.#{ext}"]
-            compiler.compile req.dir, filename, found.filename, found.content, (err, compiled, sourcemap) ->
+            compiler.compile req.dir, filename, found.filename, found.content, plunk, (err, compiled, sourcemap) ->
               if err
                 console.log "[ERR] Compilation error:", err.message
                 return res.send 500, err.message or "Compilation error"

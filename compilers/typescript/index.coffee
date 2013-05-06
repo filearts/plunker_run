@@ -22,7 +22,7 @@ createFile = ->
 module.exports =
   match: /\.js$/
   ext: ["ts"]
-  compile: (filename, source, str, fn) ->
+  compile: (filename, source, str, plunk, fn) ->
         
     jsOutput = createFile()
     mapOutput = createFile()

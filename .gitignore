@@ -17,4 +17,7 @@ npm-debug.log
 
 .c9revisions
 
+config.production.json
+config.development.json
+
 builtAssets
