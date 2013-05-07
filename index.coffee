@@ -91,7 +91,10 @@ compilers =
           bare: true
           returnObject: true
           sourceMap: true
-          filename: "#{path}#{source}"
+          filename: source
+          sourceFiles: [path+source]
+          generatedFile: path+filename
+          
           
         js = answer.js + "\n//@ sourceMappingURL=#{path}#{filename}.map"
         smap = answer.v3SourceMap

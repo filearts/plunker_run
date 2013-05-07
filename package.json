@@ -10,7 +10,7 @@
   "engines": {
     "node": "0.8.x"
   },
-  "version": "0.3.15-3",
+  "version": "0.3.15-6",
   "private": true,
   "dependencies": {
     "coffee-script": "1.6.x",
@@ -32,7 +32,8 @@
     "stylus": "*",
     "nib": "*",
     "typescript-wrapper": "*",
-    "traceur": "0.0.x"
+    "traceur": "0.0.x",
+    "uglify-js": "2.3.x"
   },
   "bundledDependencies": [
     "json-schema"
