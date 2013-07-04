@@ -6,6 +6,7 @@ mime = require("mime")
 url = require("url")
 request = require("request")
 path = require("path")
+ga = require("node-ga")
 
 
 
@@ -21,6 +22,7 @@ genid = (len = 16, prefix = "", keyspace = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghij
   prefix
 
 
+app.use ga("UA-28928507-4", safe: false)
 app.use require("./middleware/cors").middleware()
 app.use express.bodyParser()
 
@@ -165,7 +167,7 @@ renderPlunkFile = (req, res, next) ->
   else
     render = (filename) ->
       extension = "." + path.basename(filename).split(".").slice(1).join(".")
-      base = path.basename(filename, extension)
+      base = path.join path.dirname(filename), path.basename(filename, extension)
       type = mime.lookup(filename) or "text/plain"
       
       for name, compiler of compilers when filename.match(compiler.match)
