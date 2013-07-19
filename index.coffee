@@ -7,6 +7,7 @@ url = require("url")
 request = require("request")
 path = require("path")
 ga = require("node-ga")
+genid = require("genid")
 
 
 
@@ -156,13 +157,11 @@ renderPlunkFile = (req, res, next) ->
   
   if file
     res.set("Content-Type": if req.accepts(file.mime) then file.mime else "text/plain")
+    res.set("ETag", file.etag)
+    
+    if req.get("if-none-match") is file.etag then return res.send(304)
+    
     return res.send(200, file.content)
-    
-  else if sourcemap = sourcemaps.get("#{req.dir}#{filename}")
-    res.set "Content-Type", "application/json"
-    res.send 200, sourcemap
-    
-    console.log "[**] Served sourcemap", "#{req.dir}#{filename}"
     
   else
     render = (filename) ->
@@ -179,12 +178,30 @@ renderPlunkFile = (req, res, next) ->
                 return res.send 500, err.message or "Compilation error"
               else
                 if sourcemap
-                  sourcemap_id = "#{req.dir}#{filename}.map"
-                  sourcemaps.set sourcemap_id, sourcemap
+                  sourcemapFile = "#{filename}.map"
                   
-                  res.set "SourceMap", sourcemap_id
+                  smap = plunk.files[sourcemapFile] =
+                    filename: sourcemapFile
+                    content: sourcemap
+                    mime: "application/json"
+                    run_url: plunk.run_url + sourcemapFile
+                    etag: genid(16)                    
                   
-                res.set "Content-Type", if req.accepts(type) then type else "text/plain"
+                  res.set "SourceMap", req.dir + sourcemapFile
+                  
+                file = plunk.files[filename] =
+                  filename: filename
+                  content: compiled
+                  mime: mime.lookup(filename, "text/plain")
+                  run_url: plunk.run_url + filename
+                  etag: genid(16)
+                
+                found.children.push(file)
+                found.children.push(smap) if smap
+                  
+                res.set("Content-Type": if req.accepts(file.mime) then file.mime else "text/plain")
+                res.set("ETag", file.etag)
+                
                 res.send 200, compiled
             return true
             
@@ -236,17 +253,27 @@ app.post "/:id?", (req, res, next) ->
   unless valid then return next(new Error("Invalid json: #{errors}"))
   else
     id = req.params.id or genid() # Don't care about id clashes. They are disposable anyway
+    prev = previews.get(req.params.id)
     json.id = id
     json.run_url = "#{runUrl}/#{id}/"
 
     _.each json.files, (file, filename) ->
-      json.files[filename] =
-        filename: filename
-        content: file.content
-        mime: mime.lookup(filename, "text/plain")
-        run_url: json.run_url + filename
+      if (prevFile = prev?.files[filename])?.content is file.content
+        json.files[filename] = prevFile
+        json.files[child.filename] = child for child in prevFile.children
+      
+      else
+        json.files[filename] =
+          filename: filename
+          content: file.content
+          mime: mime.lookup(filename, "text/plain")
+          run_url: json.run_url + filename
+          etag: genid(16)
+          children: []
 
     previews.set(id, json)
+    
+    #return res.redirect "/#{id}/"
     
     status = if req.params.id then 200 else 201
     
@@ -254,10 +281,8 @@ app.post "/:id?", (req, res, next) ->
     req.dir = "/#{id}/"
     
     res.header "X-XSS-Protection", 0
-    #res.header "Content-Security-Policy", "default-src *"
   
-    return renderPlunkFile(req, res, next)
-    res.json(status, json)
+    renderPlunkFile(req, res, next)
 
 
 
