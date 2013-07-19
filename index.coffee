@@ -246,11 +246,17 @@ app.post "/:id?", (req, res, next) ->
         mime: mime.lookup(filename, "text/plain")
         run_url: json.run_url + filename
 
-    
     previews.set(id, json)
     
     status = if req.params.id then 200 else 201
     
+    req.plunk = json
+    req.dir = "/#{id}/"
+    
+    res.header "X-XSS-Protection", 0
+    #res.header "Content-Security-Policy", "default-src *"
+  
+    return renderPlunkFile(req, res, next)
     res.json(status, json)
 
 
