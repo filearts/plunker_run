@@ -159,7 +159,7 @@ renderPlunkFile = (req, res, next) ->
     res.set("Content-Type": if req.accepts(file.mime) then file.mime else "text/plain")
     res.set("ETag", file.etag)
     
-    if req.get("if-none-match") is file.etag then return res.send(304)
+    if (etag = req.get("if-none-match")) and etag is file.etag then return res.send(304)
     
     return res.send(200, file.content)
     
@@ -196,6 +196,7 @@ renderPlunkFile = (req, res, next) ->
                   run_url: plunk.run_url + filename
                   etag: genid(16)
                 
+                found.children ||= []
                 found.children.push(file)
                 found.children.push(smap) if smap
                   
