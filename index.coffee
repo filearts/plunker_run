@@ -6,9 +6,9 @@ mime = require("mime")
 url = require("url")
 request = require("request")
 path = require("path")
-ga = require("node-ga")
+#ga = require("node-ga")
 genid = require("genid")
-
+lactate = require("lactate")
 
 
 # Set defaults in nconf
@@ -23,10 +23,12 @@ genid = (len = 16, prefix = "", keyspace = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghij
   prefix
 
 
-app.use ga("UA-28928507-4", safe: false)
+#app.use ga("UA-28928507-4", safe: false)
 app.use require("./middleware/cors").middleware()
-app.use express.bodyParser()
-
+app.use express.urlencoded()
+app.use express.json()
+app.use lactate.static "#{__dirname}/public",
+  'max age': 'one week'
 
 LRU = require("lru-cache")
 previews = LRU(512)
@@ -36,7 +38,6 @@ apiUrl = nconf.get("url:api")
 
 coffee = require("coffee-script")
 livescript = require("LiveScript")
-iced = require("iced-coffee-script")
 less = require("less")
 sass = require("sass")
 scss = require("node-sass")
@@ -64,7 +65,7 @@ compilers =
         fn(null, sass.render(str))
       catch err
         fn(err)
-
+  
   less: 
     match: /\.css$/
     ext: ['less']
@@ -115,15 +116,6 @@ compilers =
       catch err
         fn(err)      
       
-  icedcoffee: 
-    match: /\.js$/
-    ext: ['iced']
-    compile: (path, filename, source, str, plunk, fn) ->
-      try
-        fn(null, iced.compile(str, runtime: "inline"))
-      catch err
-        fn(err)
-
   jade: 
     match: /\.html$/
     ext: ['jade']
@@ -138,8 +130,14 @@ compilers =
     match: /\.html$/
     ext: ['md',"markdown"]
     compile: (path, filename, source, str, plunk, fn) ->
+      return fn(null, "") unless source
+      
       try
-        fn(null, markdown(str))
+        fn null, """
+          <link rel="stylesheet" href="/markdown.css" type="text/css">
+          
+          #{markdown(str)}
+        """
       catch err
         fn(err)
   
@@ -209,8 +207,8 @@ renderPlunkFile = (req, res, next) ->
     test = [filename]
     test.push(file) for file in ["index.html", "example.html", "demo.html", "readme.html"] when 0 > test.indexOf(file)
       
-    for filename in test
-      return if render(filename)
+    for attempt in test
+      return if render(attempt)
     
     # Control will reach here if no file was found
     console.log "[ERR] No suitable source file for: ", filename

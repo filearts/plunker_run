@@ -1,5 +1,7 @@
 nconf = require("nconf")
 traceur = require("traceur")
+uglify = require("uglify-js")
+fs = require("fs")
 
 SourceMapGenerator = traceur.outputgeneration.SourceMapGenerator
 
@@ -9,6 +11,9 @@ traceur.options.experimental = true
 
 ext = 'es6.js'
 extRegex = /\.es6\.js$/
+
+runtime = fs.readFileSync(__dirname + "/../node_modules/traceur/src/runtime/runtime.js", "utf8")
+runtime = uglify.minify(runtime, fromString: true)
 
 module.exports = 
   match: /\.js$/
@@ -30,7 +35,7 @@ module.exports =
     for file in results.keys() when file.name is filename
       tree = results.get(file)
       code = traceur.outputgeneration.TreeWriter.write(tree, false)
-      return fn(null, code)
+      return fn(null, "#{runtime.code}\n#{code}")
     
     return fn(new Error("Unable to parse file"))
       
