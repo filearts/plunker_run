@@ -112,7 +112,7 @@ compilers =
     ext: ['ls']
     compile: (path, filename, source, str, plunk, fn) ->
       try
-        fn(null, livescript.compile(str))
+        fn(null, livescript.compile(str, {bare: true}))
       catch err
         fn(err)      
       
