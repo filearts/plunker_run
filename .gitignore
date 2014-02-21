@@ -16,6 +16,7 @@ node_modules
 npm-debug.log
 
 .c9revisions
+.modulusignore
 
 config.production.json
 config.development.json

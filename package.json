@@ -10,7 +10,7 @@
   "engines": {
     "node": "0.8.x"
   },
-  "version": "0.3.20-3",
+  "version": "0.3.21",
   "private": true,
   "dependencies": {
     "coffee-script": "1.6.x",
@@ -29,14 +29,14 @@
     "stylus": "*",
     "nib": "*",
     "typescript-wrapper": "*",
-    "traceur": "0.0.x",
     "uglify-js": "2.3.x",
     "node-ga": "0.1.x",
     "genid": "0.1.x",
     "lactate": "~0.13.12",
     "sass": "~0.5.0",
     "node-sass": "~0.6.7",
-    "strong-agent": "~0.2.18"
+    "strong-agent": "~0.2.18",
+    "traceur": "0.0.10"
   },
   "bundledDependencies": [
     "json-schema"
