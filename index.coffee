@@ -28,8 +28,8 @@ genid = (len = 16, prefix = "", keyspace = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghij
 #app.use ga("UA-28928507-4", safe: false)
 #app.use require("./middleware/subdomain").middleware()
 app.use require("./middleware/cors").middleware()
-app.use express.urlencoded()
-app.use express.json()
+app.use express.urlencoded({limit: '2mb'})
+app.use express.json({limit: '2mb'})
 app.use lactate.static "#{__dirname}/public",
   'max age': 'one week'
 
@@ -181,6 +181,8 @@ renderPlunkFile = (req, res, next) ->
   plunk = req.plunk
   filename = req.params[0] or "index.html"
   file = plunk.files[filename]
+  
+  res.charset = "utf-8"
 
   res.set "Cache-Control", "no-cache"
   res.set "Expires", 0
@@ -189,10 +191,10 @@ renderPlunkFile = (req, res, next) ->
     file.mime ||= mime.lookup(filename, "text/plain")
     
     res.set("Content-Type": if req.accepts(file.mime) then file.mime else "text/plain")
-    res.set("ETag", file.etag)
+
     
     if (etag = req.get("if-none-match")) and etag is file.etag then return res.send(304)
-    
+        
     return res.send(200, file.content)
     
   else

@@ -8,7 +8,7 @@
     "start": "server.js"
   },
   "engines": {
-    "node": "0.8.x"
+    "node": "0.10.x"
   },
   "version": "0.3.21",
   "private": true,
@@ -35,7 +35,6 @@
     "lactate": "~0.13.12",
     "sass": "~0.5.0",
     "node-sass": "~0.6.7",
-    "strong-agent": "~0.2.18",
     "traceur": "0.0.10"
   },
   "bundledDependencies": [
