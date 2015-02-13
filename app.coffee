@@ -49,6 +49,7 @@ markdown = require("marked")
 stylus = require("stylus")
 nib = require("nib")
 traceur = require("traceur")
+to5 = require("6to5")
 
 TRACEUR_RUNTIME = ""
 
@@ -94,7 +95,8 @@ compilers =
           .import("nib")
           .render(fn)
       catch err
-        fn(err)      
+        fn(err)  
+        
   coffeescript: 
     match: /\.js$/
     ext: ['coffee']
@@ -115,6 +117,27 @@ compilers =
         fn null, js, smap
       catch err
         fn(err)
+  
+  to5:
+    match: /\.js$/
+    ext: ['6to5.js']
+    compile: (path, filename, source, str, plunk, fn) ->
+      try
+        result = to5.transform str, 
+          filename: filename
+          experimental: true
+          modules: "umd"
+          sourceMap: "inline"
+          sourceMapName: source
+          sourceFileName: source
+          sourceRoot: path
+           
+        fn null, result.code, result.map
+      catch err
+        console.error("Error", err)
+        
+        fn(err)
+      
       
   traceur: 
     match: /\.js$/
