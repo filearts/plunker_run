@@ -1,5 +1,7 @@
 # Plunker runner
 
+> **DEPRECATED**: See [plunker-run-plugin](ggoodman/plunker-run-plugin)
+
 The server that runs the previewing of saved plunks and plunk previews.
 
 ### `POST /` Create a new preview
